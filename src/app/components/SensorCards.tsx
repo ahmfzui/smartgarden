@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+// Remove unused imports
 import { motion } from "framer-motion";
 import { 
   Thermometer, 

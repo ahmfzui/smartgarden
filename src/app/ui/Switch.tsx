@@ -11,7 +11,7 @@ type SwitchProps = React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> 
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   SwitchProps
->(({ className, size = "md", ...props }, ref) => {
+>(({ size = "md", ...props }, ref) => { // Removed className from destructuring since it's unused
   const sizes = {
     sm: {
       switch: "h-4 w-8",

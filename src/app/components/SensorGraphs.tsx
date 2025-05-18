@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   BarChart as BarChartIcon, 
@@ -36,6 +36,17 @@ type Sensor = {
 };
 
 type TimeFilter = '24h' | '7d' | '30d' | 'all';
+
+// Define proper types for tooltip component props
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
+  label?: string;
+}
 
 export default function SensorGraphs({ data }: { data: Sensor[] }) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('24h');
@@ -117,13 +128,13 @@ export default function SensorGraphs({ data }: { data: Sensor[] }) {
   const summary = getSummaryStats();
   const chartData = getFilteredData();
   
-  // Configure tooltips
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Configure tooltips with proper typing
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="glass-tooltip bg-black/80 backdrop-blur-md p-3 rounded-lg shadow-lg border border-white/20 text-sm text-white">
           <p className="font-medium">{`${label}`}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <p key={index} style={{ color: entry.color }}>
               {`${entry.name}: ${entry.value}`}
             </p>
