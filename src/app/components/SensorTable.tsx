@@ -1,10 +1,11 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef } from "react"; // Removed useEffect
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   ChevronDown, 
   ChevronUp, 
   Search, 
+  // Removed Download 
   Filter,
   CheckCircle2,
   X,

@@ -1,5 +1,5 @@
 "use client";
-// Remove unused imports
+// Remove useState if it's unused
 import { motion } from "framer-motion";
 import { 
   Thermometer, 
