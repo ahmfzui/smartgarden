@@ -14,7 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Smart Garden Dashboard",
-  description: "Monitor and control your smart garden system",
+  description: "Modern dashboard to monitor and control your smart garden system",
+  keywords: ["smart garden", "iot", "dashboard", "agriculture", "automation"],
+  authors: [{ name: "Ahmad Fauzi" }],
+  viewport: "width=device-width, initial-scale=1.0",
+  themeColor: "#16a34a",
 };
 
 export default function RootLayout({
@@ -23,7 +27,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="id">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
