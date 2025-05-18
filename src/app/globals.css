@@ -1,80 +1,44 @@
-/* postcss-import */
-/* tailwindcss */
-/* autoprefixer */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  body {
-    @apply bg-gradient-to-br from-garden-50 to-garden-100 min-h-screen;
-  }
+:root {
+  --garden-50: #f0f9f0;
+  --garden-100: #dcf1dc;
+  --garden-200: #bce3bc;
+  --garden-300: #8fd08f;
+  --garden-400: #5cb85c;
+  --garden-500: #449d44;
+  --garden-600: #398439;
+  --garden-700: #306a30;
+  --garden-800: #295429;
+  --garden-900: #244524;
+  --garden-950: #0e2d0e;
 }
 
-@layer components {
-  .stat-card {
-    @apply relative overflow-hidden bg-white rounded-2xl p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
-  }
-
-  .stat-card-inner {
-    @apply relative z-10;
-  }
-
-  .stat-card:after {
-    content: "";
-    @apply absolute inset-0 opacity-0 bg-garden-gradient transition-opacity duration-300;
-    opacity: 0;
-  }
-
-  .stat-card:hover:after {
-    opacity: 0.07;
-  }
-
-  .status-badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
-  }
-
-  .status-badge.on {
-    @apply bg-garden-100 text-garden-800;
-  }
-
-  .status-badge.off {
-    @apply bg-gray-100 text-gray-800;
-  }
-
-  .table-container {
-    @apply relative overflow-hidden bg-white rounded-2xl shadow-lg;
-  }
-
-  .table-header {
-    @apply bg-garden-600 text-white font-medium;
-  }
-
-  .table-row {
-    @apply even:bg-garden-50 transition-colors duration-200 hover:bg-garden-100;
-  }
-
-  .dashboard-container {
-    @apply max-w-7xl mx-auto px-4 sm:px-6 pb-10 pt-6;
-  }
-
-  .pump-control {
-    @apply flex flex-col sm:flex-row items-center justify-center gap-6 rounded-2xl bg-white p-6 shadow-lg transition-all duration-300 hover:shadow-xl;
-  }
-
-  .control-switch {
-    @apply relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-garden-600 focus:ring-offset-2;
-  }
-}
-
-.garden-title {
-  text-shadow: 0 2px 15px rgba(34, 197, 94, 0.3);
+body {
+  @apply antialiased text-gray-800;
+  background-color: #f9fdf9;
+  overflow-x: hidden;
 }
 
 .animated-bg-gradient {
   background-size: 400% 400%;
   animation: gradient 15s ease infinite;
+  position: relative;
+}
+
+.animated-bg-gradient::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23449d44' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg width='84' height='48' viewBox='0 0 84 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h12v6H0V0zm28 8h12v6H28V8zm14-8h12v6H42V0zm14 0h12v6H56V0zm0 8h12v6H56V8zM42 8h12v6H42V8zm0 16h12v6H42v-6zm14-8h12v6H56v-6zm14 0h12v6H70v-6zm0-16h12v6H70V0zM28 32h12v6H28v-6zM14 16h12v6H14v-6zM0 24h12v6H0v-6zm0 8h12v6H0v-6zm14 0h12v6H14v-6zm14 8h12v6H28v-6zm-14 0h12v6H14v-6zm28 0h12v6H42v-6zm14-8h12v6H56v-6zm0-8h12v6H56v-6zm14 8h12v6H70v-6zm0 8h12v6H70v-6zM14 24h12v6H14v-6zm14-8h12v6H28v-6zM14 8h12v6H14V8zM0 8h12v6H0V8z' fill='%23449d44' fill-opacity='0.07' fill-rule='evenodd'/%3E%3C/svg%3E");
+  opacity: 0.8;
+  z-index: -1;
 }
 
 @keyframes gradient {
@@ -89,53 +53,237 @@
   }
 }
 
-.ripple-container {
-  position: relative;
+.dashboard-container {
+  @apply max-w-7xl mx-auto px-4 sm:px-6 pb-10 pt-6;
 }
 
-.ripple-container::before {
+.garden-title {
+  @apply relative;
+  text-shadow: 0 2px 10px rgba(68, 157, 68, 0.2);
+}
+
+.garden-title::after {
   content: "";
   position: absolute;
-  top: 50%;
+  bottom: -8px;
   left: 50%;
-  width: 100%;
-  height: 100%;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background-color: rgba(66, 222, 128, 0.3);
-  animation: ripple 2s linear infinite;
-  z-index: 1;
+  transform: translateX(-50%);
+  width: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--garden-400), var(--garden-600));
+  border-radius: 2px;
+  animation: growWidth 1.5s forwards ease-out;
 }
 
-@keyframes ripple {
+@keyframes growWidth {
   0% {
-    transform: translate(-50%, -50%) scale(0.5);
-    opacity: 0.8;
+    width: 0;
   }
   100% {
-    transform: translate(-50%, -50%) scale(1.5);
-    opacity: 0;
+    width: 120px;
   }
 }
 
-.shimmer {
+/* Particles and animation effects */
+.floating-leaves {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.leaf {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23449d44' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22'%3E%3C/path%3E%3C/svg%3E");
+  animation-name: fall, spin;
+  animation-timing-function: linear, ease-in-out;
+  animation-iteration-count: infinite;
+  animation-duration: calc(25s + (var(--random) * 10s)), calc(4s + (var(--random) * 5s));
+  opacity: 0.3;
+}
+
+@keyframes fall {
+  0% {
+    transform: translateY(-20vh) translateX(calc(var(--random) * 10vw));
+  }
+  100% {
+    transform: translateY(100vh) translateX(calc(var(--random) * 20vw));
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Glassmorphism styles */
+.glass-card {
+  @apply rounded-2xl relative overflow-hidden;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 
+    0 4px 30px rgba(0, 0, 0, 0.05),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.glass-card:hover {
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 
+    0 10px 30px rgba(68, 157, 68, 0.1),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  transform: translateY(-5px);
+}
+
+.glass-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -50%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 100%
+  );
+  transform: skewX(-25deg);
+  transition: all 0.75s ease;
+}
+
+.glass-card:hover::before {
+  left: 125%;
+}
+
+.stat-card {
+  @apply p-6 rounded-2xl bg-white shadow-lg transition-all duration-300;
+}
+
+.stat-card-inner {
+  @apply relative z-10;
+}
+
+.table-container {
+  @apply rounded-2xl bg-white shadow-lg overflow-hidden;
+}
+
+.table-header {
+  @apply bg-garden-600 text-white;
+}
+
+.table-row {
+  @apply border-b border-garden-100 hover:bg-garden-50 transition-colors;
+}
+
+.status-badge {
+  @apply px-3 py-1 rounded-full text-xs font-medium;
+}
+
+.status-badge.on {
+  @apply bg-garden-500 text-white;
+}
+
+.status-badge.off {
+  @apply bg-gray-200 text-gray-600;
+}
+
+/* Water ripple animation */
+.ripple-container {
   position: relative;
   overflow: hidden;
 }
 
-.shimmer::after {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  transform: translateX(-100%);
-  background-image: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.4) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  animation: shimmer 2s infinite;
+.ripple-container::after {
   content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  background: rgba(68, 157, 68, 0.4);
+  opacity: 0;
+  border-radius: 100%;
+  transform: scale(1);
+  animation: ripple 2s infinite;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(40);
+    opacity: 0;
+  }
+}
+
+/* Glow effects */
+.glow-text {
+  text-shadow: 0 0 10px rgba(68, 157, 68, 0.5);
+}
+
+.glow-border {
+  box-shadow: 0 0 15px rgba(68, 157, 68, 0.3);
+}
+
+/* Add water drop effect */
+.water-drop {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: rgba(120, 190, 255, 0.6);
+  animation: drop 2s infinite;
+}
+
+@keyframes drop {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  80% {
+    transform: translateY(20px) scale(0.7);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(30px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* 3D card effect */
+.card-3d {
+  transition: transform 0.5s ease;
+  transform-style: preserve-3d;
+}
+
+/* Green particle animation */
+.particle-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: -10;
+}
+
+.particle {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: rgba(68, 157, 68, 0.15);
+  border-radius: 50%;
 }
