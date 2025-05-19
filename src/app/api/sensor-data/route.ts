@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const db = client.db("smartgarden");
     
     // Insert sensor data
-    await db.collection("sensors").insertOne(data);
+    await db.collection("sensorData").insertOne(data);
     
     // Check soil moisture and update pump status if in automatic mode
     const settings = await db.collection("settings").findOne({ type: "pump" });
