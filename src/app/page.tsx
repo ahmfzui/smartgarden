@@ -5,7 +5,8 @@ import SensorCards from "./components/SensorCards";
 import PumpControl from "./components/PumpControl";
 import SensorTable from "./components/SensorTable";
 import SensorGraphs from "./components/SensorGraphs";
-import { Leaf, Github, BarChart2, Droplets, RefreshCw } from "lucide-react";
+import { Leaf, Github, BarChart2, Droplets, RefreshCw, GaugeCircle, AlertCircle, Clock } from "lucide-react";
+import useSWR from "swr";
 
 type Sensor = {
   temperature: number;
@@ -23,6 +24,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'graphs' | 'history'>('overview');
+  const [error, setError] = useState<string | null>(null);
   
   // Refs for effects
   const dashboardRef = useRef<HTMLDivElement>(null);
@@ -44,38 +46,69 @@ export default function HomePage() {
     }
   };
 
-  const fetchAll = async () => {
-    try {
-      setLoading(true);
-      const res = await fetch("/api/history");
-      const data = await res.json();
-      setHistory(data);
-      if (data.length > 0) setLatest(data[0]);
-
-      const pumpRes = await fetch("/api/pump-control");
-      const pumpData = await pumpRes.json();
-      setPumpStatus(pumpData.pumpStatus);
-      setManual(pumpData.manual);
-    } catch (error) {
-      console.error("Error fetching data:", error);
-    } finally {
-      setLoading(false);
+  // SWR fetcher function with error handling
+  const fetcher = async (url: string) => {
+    const res = await fetch(url);
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.message || "An error occurred");
     }
+    
+    return res.json();
   };
   
+  // Use SWR for automatic data refreshing
+  const { data: historyData, mutate: refreshHistory } = useSWR("/api/history", fetcher, {
+    refreshInterval: 3000, // Refresh every 3 seconds
+    dedupingInterval: 1000,
+    revalidateOnFocus: true,
+    onSuccess: (data) => {
+      setHistory(data);
+      if (data.length > 0) {
+        setLatest(data[0]);
+      }
+      setLoading(false);
+      setError(null); // Clear any previous errors
+    },
+    onError: (err) => {
+      console.error("Error fetching history:", err);
+      setLoading(false);
+      setError(err.message || "Failed to fetch sensor data");
+    }
+  });
+  
+  // Use SWR for pump control data
+  const { data: pumpData, mutate: refreshPump } = useSWR("/api/pump-control", fetcher, {
+    refreshInterval: 1000, // Refresh every 1 second for better responsiveness
+    dedupingInterval: 500,
+    revalidateOnFocus: true,
+    onSuccess: (data) => {
+      if (data) {
+        setPumpStatus(data.pumpStatus);
+        setManual(data.manual);
+      }
+      setError(null);
+    },
+    onError: (error) => {
+      console.error("Error fetching pump control:", error);
+      setError(error.message || "Failed to fetch pump status");
+    }
+  });
+  
+  // Manual refresh handler
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchAll();
-    setTimeout(() => setRefreshing(false), 800);
+    try {
+      await Promise.all([refreshHistory(), refreshPump()]);
+      setError(null);
+    } catch (error) {
+      console.error("Error during manual refresh:", error);
+      setError(error instanceof Error ? error.message : "Error refreshing data");
+    } finally {
+      setTimeout(() => setRefreshing(false), 800);
+    }
   };
-
-  useEffect(() => {
-    fetchAll();
-    const interval = setInterval(() => {
-      fetchAll();
-    }, 30000); // Fetch every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
 
   // Transforms for parallax elements
   const blob1X = useTransform(mouseX, [0, 1], [-15, 15]);
@@ -216,135 +249,182 @@ export default function HomePage() {
       />
       
       {/* Dashboard Container */}
-      <div className="dashboard-container relative z-10 pt-8">
-        <header className="mb-10">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <motion.div 
-              className="flex items-center mb-6 md:mb-0 relative"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
-            >
-              {/* Logo and Title */}
-              <div className="logo-container relative">
-                <motion.div
-                  className="w-20 h-20 rounded-2xl bg-gradient-to-br from-green-400 via-green-500 to-emerald-600 shadow-lg flex items-center justify-center border border-white/20"
-                  whileHover={{ rotate: 5 }}
-                  style={{
-                    boxShadow: "0 8px 32px rgba(31, 209, 103, 0.4)"
-                  }}
-                >
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.05, 1],
-                      rotate: [0, 5, 0, -5, 0] 
-                    }}
-                    transition={{ 
-                      duration: 8, 
-                      ease: "easeInOut",
-                      repeat: Infinity 
-                    }}
-                  >
-                    <Leaf className="h-10 w-10 text-white drop-shadow-md" />
-                  </motion.div>
-                </motion.div>
-                
-                {/* Glowing logo effect */}
-                <motion.div
-                  className="absolute -inset-3 rounded-full bg-green-400/20 blur-xl -z-10"
-                  animate={{ 
-                    scale: [1, 1.2, 1],
-                    opacity: [0.5, 0.8, 0.5] 
-                  }}
-                  transition={{ 
-                    duration: 5, 
-                    ease: "easeInOut",
-                    repeat: Infinity 
-                  }}
-                />
-              </div>
-              
-              <div className="ml-5">
-                <motion.h1 
-                  className="text-4xl md:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-green-200"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.2, duration: 0.5 }}
-                >
-                  Smart Garden
-                </motion.h1>
-                <motion.p
-                  className="text-emerald-300/90 text-md"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.4, duration: 0.5 }}
-                >
-                  Monitor & Control Dashboard
-                </motion.p>
-              </div>
-            </motion.div>
-            
-            {/* Refresh button and timestamp */}
-            <motion.div
-              className="flex flex-col items-end"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3, duration: 0.5 }}
-            >
-              <motion.button
-                className="glass-button-primary flex items-center gap-2 px-5 py-2 mb-2"
-                onClick={handleRefresh}
-                whileHover={{ scale: 1.03, y: -2 }}
-                whileTap={{ scale: 0.97 }}
-                disabled={refreshing}
+      <div className="dashboard-container relative z-10 pt-8 pb-8">
+        {/* Header */}
+        <div className="p-0 rounded-3xl relative overflow-hidden bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-white/10 shadow-lg mb-6">
+          <div className="bg-gradient-to-r from-emerald-900/60 via-green-800/60 to-teal-900/60 px-4 py-3 border-b border-white/10">
+            <div className="flex flex-col md:flex-row items-center justify-between">
+              <motion.div 
+                className="flex items-center mb-4 md:mb-0 relative"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
               >
-                <motion.div
-                  animate={{ rotate: refreshing ? 360 : 0 }}
-                  transition={{ duration: 1, ease: "linear", repeat: refreshing ? Infinity : 0 }}
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </motion.div>
-                <span>{refreshing ? 'Menyegarkan...' : 'Segarkan Data'}</span>
-              </motion.button>
+                {/* Logo and Title */}
+                <div className="logo-container relative">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-green-400 via-green-500 to-emerald-600 shadow-lg flex items-center justify-center border border-white/20">
+                    <motion.div
+                      animate={{ 
+                        scale: [1, 1.05, 1],
+                        rotate: [0, 2, 0, -2, 0] 
+                      }}
+                      transition={{ 
+                        duration: 6, 
+                        ease: "easeInOut",
+                        repeat: Infinity 
+                      }}
+                    >
+                      <Leaf className="h-7 w-7 text-white drop-shadow-md" />
+                    </motion.div>
+                  </div>
+                </div>
+                
+                <div className="ml-4 flex flex-col">
+                  <motion.h1 
+                    className="text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-green-200"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.2, duration: 0.5 }}
+                  >
+                    Smart Garden System - Kelompok 3
+                  </motion.h1>
+                  <motion.p
+                    className="text-emerald-300/90 text-xs md:text-sm"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.5 }}
+                  >
+                    Monitor & Control Dashboard
+                  </motion.p>
+                </div>
+              </motion.div>
               
-              <div className="glass-panel px-4 py-2 rounded-lg text-sm text-emerald-100">
-                <span>
-                  {new Date().toLocaleDateString('id-ID', { 
-                    weekday: 'long', 
-                    day: 'numeric',
-                    month: 'long', 
-                    year: 'numeric' 
-                  })}
+              {/* Right side controls */}
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col md:flex-row items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                    <Clock className="h-3.5 w-3.5 text-blue-300/70" />
+                    <span className="text-xs text-white/70">
+                      {new Date().toLocaleDateString('id-ID', { 
+                        day: 'numeric',
+                        month: 'short', 
+                        year: 'numeric' 
+                      })}
+                    </span>
+                  </div>
+                  
+                  <motion.button
+                    className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600/80 to-emerald-700/80 hover:from-emerald-500/80 hover:to-emerald-600/80 text-white border border-emerald-500/30 shadow-md"
+                    onClick={handleRefresh}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ y: 1 }}
+                    disabled={refreshing}
+                  >
+                    <motion.div
+                      animate={{ rotate: refreshing ? 360 : 0 }}
+                      transition={{ duration: 1, ease: "linear", repeat: refreshing ? Infinity : 0 }}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    </motion.div>
+                    <span className="text-xs">{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Status bar */}
+          <div className="p-3 flex flex-wrap items-center justify-between gap-2 bg-black/20">
+            {/* System stats */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className={`h-2 w-2 rounded-full ${latest ? 'bg-emerald-500 animate-pulse' : 'bg-gray-500'}`}></div>
+                <span className="text-xs text-white/70">
+                  Status: <span className="font-medium text-emerald-400">{latest ? 'Online' : 'Connecting...'}</span>
+                </span>
+              </div>
+              
+              <div className="h-3 border-r border-white/10"></div>
+              
+              <div className="flex items-center gap-1.5">
+                <GaugeCircle className="h-3 w-3 text-blue-400/70" />
+                <span className="text-xs text-white/70">
+                  Mode: <span className="font-medium">{manual ? 'Manual' : 'Auto'}</span>
                 </span>
               </div>
               
               {latest && (
-                <p className="text-xs text-emerald-300/80 mt-1">
-                  Terakhir diperbarui: {new Date(latest.timestamp).toLocaleTimeString()}
-                </p>
+                <>
+                  <div className="h-3 border-r border-white/10"></div>
+                  <div className="flex items-center gap-1.5">
+                    <Droplets className="h-3 w-3 text-cyan-400/70" />
+                    <span className="text-xs text-white/70">
+                      Pompa: <span className={`font-medium ${pumpStatus === 1 ? 'text-emerald-400' : 'text-white/50'}`}>
+                        {pumpStatus === 1 ? 'Aktif' : 'Nonaktif'}
+                      </span>
+                    </span>
+                  </div>
+                </>
               )}
-            </motion.div>
+            </div>
+            
+            {latest && (
+              <div className="text-xs text-white/50">
+                Terakhir diperbarui: {new Date(latest.timestamp).toLocaleTimeString('id-ID', {hour: '2-digit', minute: '2-digit', second: '2-digit'})}
+              </div>
+            )}
           </div>
-        </header>
+        </div>
+        
+        {/* Error Alert */}
+        <AnimatePresence>
+          {error && (
+            <motion.div 
+              className="mb-4 mx-auto px-4 py-3 bg-gradient-to-r from-red-800/60 to-rose-800/60 text-white rounded-lg border border-red-500/30 flex items-center gap-3"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              <AlertCircle className="h-5 w-5 text-red-300" />
+              <div>
+                <p className="font-medium">Terjadi kesalahan</p>
+                <p className="text-sm text-white/80">{error}</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         {/* Navigation Tabs */}
-        <div className="glass-tabs mb-8 p-1 rounded-xl flex justify-center mx-auto">
+        <div className="mb-6 p-1 rounded-xl flex justify-center mx-auto bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-white/10 shadow-md">
           <button 
-            className={`tab-button ${activeTab === 'overview' ? 'tab-active' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              activeTab === 'overview' ? 
+              'bg-gradient-to-r from-emerald-600/80 to-emerald-700/80 text-white shadow-md' : 
+              'text-white/80 hover:bg-white/5'
+            }`}
             onClick={() => setActiveTab('overview')}
           >
             <Leaf className="h-4 w-4" />
             <span>Overview</span>
           </button>
           <button 
-            className={`tab-button ${activeTab === 'graphs' ? 'tab-active' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              activeTab === 'graphs' ? 
+              'bg-gradient-to-r from-blue-600/80 to-blue-700/80 text-white shadow-md' : 
+              'text-white/80 hover:bg-white/5'
+            }`}
             onClick={() => setActiveTab('graphs')}
           >
             <BarChart2 className="h-4 w-4" />
             <span>Analytics</span>
           </button>
           <button 
-            className={`tab-button ${activeTab === 'history' ? 'tab-active' : ''}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+              activeTab === 'history' ? 
+              'bg-gradient-to-r from-purple-600/80 to-purple-700/80 text-white shadow-md' : 
+              'text-white/80 hover:bg-white/5'
+            }`}
             onClick={() => setActiveTab('history')}
           >
             <Droplets className="h-4 w-4" />
@@ -363,12 +443,12 @@ export default function HomePage() {
               key="loading"
             >
               <div className="relative">
-                <div className="glass-loading">
+                <div className="relative w-20 h-20 rounded-full flex items-center justify-center bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-white/10 shadow-md">
                   <motion.div 
-                    className="absolute inset-0 border-4 border-green-200/40 rounded-full"
+                    className="absolute inset-0 border-4 border-emerald-500/20 rounded-full"
                     animate={{ 
                       rotate: 360,
-                      borderTopColor: 'rgba(34, 197, 94, 0.8)'
+                      borderTopColor: 'rgba(16, 185, 129, 0.8)'
                     }}
                     transition={{ 
                       duration: 1.5, 
@@ -377,10 +457,10 @@ export default function HomePage() {
                     }}
                   />
                   <div className="flex items-center justify-center h-full">
-                    <Leaf className="h-6 w-6 text-green-500" />
+                    <Leaf className="h-6 w-6 text-emerald-500" />
                   </div>
                 </div>
-                <p className="text-center mt-4 text-green-300">Loading garden data...</p>
+                <p className="text-center mt-4 text-emerald-300">Memuat data sensor...</p>
               </div>
             </motion.div>
           ) : (
@@ -397,7 +477,11 @@ export default function HomePage() {
                   <PumpControl
                     initialStatus={pumpStatus}
                     initialManual={manual}
-                    onSuccess={fetchAll}
+                    onSuccess={() => {
+                      // Trigger immediate revalidation of both data sources
+                      refreshPump();
+                      refreshHistory();
+                    }}
                   />
                 </motion.div>
               )}
@@ -429,50 +513,40 @@ export default function HomePage() {
           )}
         </AnimatePresence>
         
-        <motion.footer 
-          className="mt-12 px-8 py-6 rounded-3xl bg-white/10 backdrop-blur-xl shadow-lg border border-white/20"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4, duration: 0.6 }}
-        >
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Logo + Branding */}
+        {/* Footer */}
+        <div className="mt-8 p-0 rounded-3xl overflow-hidden bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-white/10 shadow-lg">
+          <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-slate-900/60 via-slate-800/60 to-slate-900/60">
+            <h3 className="text-sm font-medium text-white/90">Smart Garden Dashboard</h3>
+          </div>
+          
+          <div className="px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* System info */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-green-300/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-green-300/30">
-                <Leaf className="h-5 w-5 text-green-400" />
+              <div className="w-8 h-8 rounded-full bg-emerald-500/20 backdrop-blur-md flex items-center justify-center shadow-inner border border-emerald-500/30">
+                <Leaf className="h-4 w-4 text-emerald-400" />
               </div>
-              <span className="text-lg font-semibold text-white drop-shadow-sm tracking-tight">
-                Smart Garden Dashboard
-              </span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-white/90">Smart Garden System</span>
+                <span className="text-xs text-white/60">Sistem monitoring dan kontrol kebun otomatis</span>
+              </div>
             </div>
 
-            {/* Info + Link */}
-            <div className="flex items-center gap-2 text-sm text-white/80">
-              <span>Made with</span>
-              <motion.div
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ repeat: Infinity, duration: 1.5 }}
-                className="text-pink-400"
-              >
-                ❤️
-              </motion.div>
-
-              {/* Divider */}
-              <span className="mx-2 hidden md:inline text-white/30">|</span>
-
-              {/* Source Code */}
+            {/* Links */}
+            <div className="flex items-center gap-4 ml-auto">
+              <span className="text-xs text-white/60">Made with ❤️</span>
+              
               <a 
                 href="https://github.com/ahmfzui/smartgarden" 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-white/90 hover:text-green-300 transition-colors"
+                className="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-lg bg-white/5 hover:bg-white/10 text-xs font-medium text-white/80 transition-colors border border-white/10"
               >
-                <Github className="h-4 w-4" />
+                <Github className="h-3.5 w-3.5" />
                 Source Code
               </a>
             </div>
           </div>
-        </motion.footer>
+        </div>
       </div>
     </div>
   );

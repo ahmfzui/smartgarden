@@ -8,7 +8,6 @@ export async function GET() {
     .collection("sensorData")
     .find({})
     .sort({ timestamp: -1 })
-    .limit(100)
     .toArray();
   return NextResponse.json(data);
 }
