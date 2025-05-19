@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { MongoClient } from "mongodb";
-import { validateApiKey } from "@/lib/apikey";
-
-// Gunakan header yang lebih simpel
-function allowAllHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': '*',
-    'Access-Control-Allow-Headers': '*'
-  };
-}
+import { validateApiKey, corsHeaders, isLocalRequest } from "@/lib/auth";
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: allowAllHeaders() });
+  return NextResponse.json({}, { headers: corsHeaders() });
 }
 
 export async function GET(request: NextRequest) {
-  // Extract API key dari query parameter
+  // Verifikasi autentikasi berdasarkan sumbernya
   const apiKey = request.nextUrl.searchParams.get('key');
+  const isLocal = isLocalRequest(request);
   
-  // Validasi API key
-  if (!validateApiKey(apiKey)) {
+  // Jika bukan request lokal dan tidak memiliki API key yang valid
+  if (!isLocal && !validateApiKey(apiKey)) {
     return NextResponse.json(
       { error: "Unauthorized" }, 
-      { status: 401, headers: allowAllHeaders() }
+      { status: 401, headers: corsHeaders() }
     );
   }
   
@@ -38,12 +30,12 @@ export async function GET(request: NextRequest) {
       .limit(100)
       .toArray();
     
-    return NextResponse.json(data, { headers: allowAllHeaders() });
+    return NextResponse.json(data, { headers: corsHeaders() });
   } catch (error) {
     console.error("Error fetching historical data:", error);
     return NextResponse.json(
       { error: "Failed to fetch historical data", message: error instanceof Error ? error.message : String(error) },
-      { status: 500, headers: allowAllHeaders() }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

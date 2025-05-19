@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { MongoClient } from "mongodb";
-import { validateApiKey, API_KEY } from "@/lib/apikey";
-
-// Gunakan header yang lebih simpel
-function allowAllHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': '*',
-    'Access-Control-Allow-Headers': '*'
-  };
-}
+import { validateApiKey, corsHeaders, isLocalRequest } from "@/lib/auth";
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: allowAllHeaders() });
+  return NextResponse.json({}, { headers: corsHeaders() });
 }
 
 export async function GET(request: NextRequest) {
-  // Extract API key dari query parameter
+  // Verifikasi autentikasi berdasarkan sumbernya
   const apiKey = request.nextUrl.searchParams.get('key');
+  const isLocal = isLocalRequest(request);
   
-  // Validasi API key
-  if (!validateApiKey(apiKey)) {
+  // Jika bukan request lokal dan tidak memiliki API key yang valid
+  if (!isLocal && !validateApiKey(apiKey)) {
     return NextResponse.json(
       { error: "Unauthorized" }, 
-      { status: 401, headers: allowAllHeaders() }
+      { status: 401, headers: corsHeaders() }
     );
   }
   
@@ -38,25 +30,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       pumpStatus: latest ? latest.pumpStatus : 0,
       manual: latest ? !!latest.manual : false,
-    }, { headers: allowAllHeaders() });
+    }, { headers: corsHeaders() });
   } catch (error) {
     console.error("Error fetching pump status:", error);
     return NextResponse.json(
       { error: "Failed to fetch pump status", message: error instanceof Error ? error.message : String(error) },
-      { status: 500, headers: allowAllHeaders() }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }
 
 export async function POST(req: NextRequest) {
-  // Extract API key dari query parameter
+  // Verifikasi autentikasi berdasarkan sumbernya
   const apiKey = req.nextUrl.searchParams.get('key');
+  const isLocal = isLocalRequest(req);
   
-  // Validasi API key
-  if (!validateApiKey(apiKey)) {
+  // Jika bukan request lokal dan tidak memiliki API key yang valid
+  if (!isLocal && !validateApiKey(apiKey)) {
     return NextResponse.json(
       { error: "Unauthorized" }, 
-      { status: 401, headers: allowAllHeaders() }
+      { status: 401, headers: corsHeaders() }
     );
   }
   
@@ -65,7 +58,7 @@ export async function POST(req: NextRequest) {
     if (typeof pumpStatus !== "number" || typeof manual !== "boolean") {
       return NextResponse.json(
         { error: "Invalid payload" }, 
-        { status: 400, headers: allowAllHeaders() }
+        { status: 400, headers: corsHeaders() }
       );
     }
     
@@ -79,13 +72,13 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json(
       { success: true }, 
-      { headers: allowAllHeaders() }
+      { headers: corsHeaders() }
     );
   } catch (error) {
     console.error("Error updating pump status:", error);
     return NextResponse.json(
       { error: "Failed to update pump status", message: error instanceof Error ? error.message : String(error) },
-      { status: 500, headers: allowAllHeaders() }
+      { status: 500, headers: corsHeaders() }
     );
   }
 }

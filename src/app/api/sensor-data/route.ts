@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "@/lib/mongodb";
 import { MongoClient } from "mongodb";
-import { validateApiKey } from "@/lib/apikey";
+import { validateApiKey, corsHeaders, isLocalRequest } from "@/lib/auth";
 
 // Define sensor data type
 interface SensorData {
@@ -12,28 +12,20 @@ interface SensorData {
   timestamp?: Date;
 }
 
-// Gunakan header yang lebih simpel
-function allowAllHeaders() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': '*',
-    'Access-Control-Allow-Headers': '*'
-  };
-}
-
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: allowAllHeaders() });
+  return NextResponse.json({}, { headers: corsHeaders() });
 }
 
 export async function GET(request: NextRequest) {
-  // Extract API key dari query parameter
+  // Verifikasi autentikasi berdasarkan sumbernya
   const apiKey = request.nextUrl.searchParams.get('key');
+  const isLocal = isLocalRequest(request);
   
-  // Validasi API key
-  if (!validateApiKey(apiKey)) {
+  // Jika bukan request lokal dan tidak memiliki API key yang valid
+  if (!isLocal && !validateApiKey(apiKey)) {
     return NextResponse.json(
       { error: "Unauthorized" }, 
-      { status: 401, headers: allowAllHeaders() }
+      { status: 401, headers: corsHeaders() }
     );
   }
   
@@ -47,25 +39,25 @@ export async function GET(request: NextRequest) {
       .limit(25)
       .toArray();
     
-    return NextResponse.json(latestData, { headers: allowAllHeaders() });
+    return NextResponse.json(latestData, { headers: corsHeaders() });
   } catch (error) {
     console.error("Error fetching sensor data:", error);
     return NextResponse.json({ 
       error: "Failed to fetch sensor data",
       message: error instanceof Error ? error.message : String(error) 
-    }, { status: 500, headers: allowAllHeaders() });
+    }, { status: 500, headers: corsHeaders() });
   }
 }
 
 export async function POST(request: NextRequest) {
-  // Extract API key dari query parameter
+  // Untuk POST sensor data, tetap wajibkan API key
   const apiKey = request.nextUrl.searchParams.get('key');
   
   // Validasi API key
   if (!validateApiKey(apiKey)) {
     return NextResponse.json(
       { error: "Unauthorized" }, 
-      { status: 401, headers: allowAllHeaders() }
+      { status: 401, headers: corsHeaders() }
     );
   }
   
@@ -81,7 +73,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Invalid sensor data format" }, 
-        { status: 400, headers: allowAllHeaders() }
+        { status: 400, headers: corsHeaders() }
       );
     }
     
@@ -109,12 +101,12 @@ export async function POST(request: NextRequest) {
       success: true, 
       pumpStatus, 
       manual
-    }, { headers: allowAllHeaders() });
+    }, { headers: corsHeaders() });
   } catch (error) {
     console.error("Error saving sensor data:", error);
     return NextResponse.json({ 
       error: "Failed to save sensor data",
       message: error instanceof Error ? error.message : String(error) 
-    }, { status: 500, headers: allowAllHeaders() });
+    }, { status: 500, headers: corsHeaders() });
   }
 }
