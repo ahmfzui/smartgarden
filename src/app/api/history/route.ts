@@ -27,7 +27,6 @@ export async function GET(request: NextRequest) {
       .collection("sensorData")
       .find({})
       .sort({ timestamp: -1 })
-      .limit(100)
       .toArray();
     
     return NextResponse.json(data, { headers: corsHeaders() });
