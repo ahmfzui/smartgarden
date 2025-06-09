@@ -17,7 +17,7 @@ export async function middleware(request: NextRequest) {
     
     // If no valid API key and it's not from the dashboard, reject
     const referer = request.headers.get('referer');
-    if (!referer || (!referer.includes('smartgarden-nine.vercel.app') && !referer.includes('localhost'))) {
+    if (!referer || (!referer.includes('smartgarden-production.up.railway.app') && !referer.includes('localhost'))) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
   }

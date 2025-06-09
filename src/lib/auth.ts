@@ -12,7 +12,7 @@ export function isLocalRequest(req: Request): boolean {
   // Checking if the request comes from our website
   const referer = req.headers.get('referer');
   if (referer && (
-    referer.includes('smartgarden-nine.vercel.app') || 
+    referer.includes('smartgarden-production.up.railway.app') || 
     referer.includes('localhost')
   )) {
     return true;
