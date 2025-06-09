@@ -7,6 +7,9 @@ import SensorTable from "./components/SensorTable";
 import SensorGraphs from "./components/SensorGraphs";
 import { Leaf, Github, BarChart2, Droplets, RefreshCw, GaugeCircle, AlertCircle, Clock } from "lucide-react";
 import useSWR from "swr";
+import LogoutButton from "./components/LogoutButton";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 type Sensor = {
   temperature: number;
@@ -25,6 +28,8 @@ export default function HomePage() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'graphs' | 'history'>('overview');
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+  const { user, checkAuth } = useAuth();
   
   // Refs for effects
   const dashboardRef = useRef<HTMLDivElement>(null);
@@ -33,6 +38,17 @@ export default function HomePage() {
   // Motion values for parallax effects
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
+  
+  // Check authentication first
+  useEffect(() => {
+    const verifyAuth = async () => {
+      await checkAuth();
+    };
+    
+    if (!user) {
+      verifyAuth();
+    }
+  }, [checkAuth, user]);
   
   // Handle mouse move for subtle parallax
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -312,6 +328,21 @@ export default function HomePage() {
                       })}
                     </span>
                   </div>
+                  
+                  {user && (
+                    <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                      <div className="h-5 w-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <span className="text-xs font-medium text-emerald-300">
+                          {user.name?.charAt(0).toUpperCase() || "U"}
+                        </span>
+                      </div>
+                      <span className="text-xs text-white/70">
+                        {user.name || "User"}
+                      </span>
+                    </div>
+                  )}
+                  
+                  <LogoutButton />
                   
                   <motion.button
                     className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-gradient-to-r from-emerald-600/80 to-emerald-700/80 hover:from-emerald-500/80 hover:to-emerald-600/80 text-white border border-emerald-500/30 shadow-md"

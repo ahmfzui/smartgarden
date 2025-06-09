@@ -1,32 +1,56 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export function middleware(request: NextRequest) {
-  // Tangani permintaan preflight OPTIONS
-  if (request.method === 'OPTIONS') {
-    return new NextResponse(null, {
-      status: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Max-Age': '86400',
-      },
-    });
-  }
+// Define auth routes and paths that should be public
+const publicPaths = ['/auth/login', '/auth/register', '/api/auth/login', '/api/auth/register', '/api/auth/verify'];
 
-  // Teruskan permintaan, tetapi tambahkan header CORS ke respons
-  const response = NextResponse.next();
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
   
-  // Header CORS yang diperlukan
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  return response;
+  // Check if the path is API path for ESP32 (needs to bypass auth)
+  if (pathname.startsWith('/api/sensor') || pathname.startsWith('/api/pump')) {
+    // ESP32 requests should have API_KEY in headers or query params
+    const apiKey = request.headers.get('x-api-key') || request.nextUrl.searchParams.get('key');
+    
+    if (apiKey === process.env.API_KEY) {
+      return NextResponse.next();
+    }
+    
+    // If no valid API key and it's not from the dashboard, reject
+    const referer = request.headers.get('referer');
+    if (!referer || (!referer.includes('smartgarden-nine.vercel.app') && !referer.includes('localhost'))) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+  }
+  
+  // Always allow public paths
+  if (publicPaths.some(path => pathname.startsWith(path))) {
+    return NextResponse.next();
+  }
+  
+  // Check for auth token in cookies
+  const token = request.cookies.get('smart-garden-auth')?.value;
+  
+  // If no token and trying to access protected route, redirect to login
+  if (!token) {
+    const url = new URL('/auth/login', request.url);
+    return NextResponse.redirect(url);
+  }
+  
+  // For authenticated users, allow access
+  return NextResponse.next();
 }
 
-// Terapkan middleware ini hanya ke rute API
+// Configure which paths middleware will run on
 export const config = {
-  matcher: '/api/:path*',
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public|).*)',
+  ],
 };
