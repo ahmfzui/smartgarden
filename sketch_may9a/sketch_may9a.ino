@@ -1,152 +1,337 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <DHT.h>
+#include <ArduinoJson.h>
+#include <WiFiClientSecure.h>
 
 // WiFi credentials
-const char* ssid = "fh_f35a00";
-const char* password = "wlan0ca5ff";
+const char* ssid = "fauzi";
+const char* password = "fauzi231104";
 
-// API Endpoints (GANTI sesuai server Next.js kamu!)
-const char* sensorApiUrl = "http://192.168.1.8:3000/api/sensor-data";
-const char* pumpControlApiUrl = "http://192.168.1.8:3000/api/pump-control";
+// API Key
+const char* API_KEY = "smart-garden-2023";
 
+// API Endpoints
+const char* sensorApiUrl = "https://smartgarden-nine.vercel.app/api/sensor-data?key=smart-garden-2023";
+const char* pumpControlApiUrl = "https://smartgarden-nine.vercel.app/api/pump-control?key=smart-garden-2023";
+
+// Pin configurations
 #define DHT_PIN 4
 #define SOIL_MOISTURE_PIN 34
-#define RELAY_PIN 23
+#define RELAY_PIN 5
 #define DHTTYPE DHT22
 DHT dht(DHT_PIN, DHTTYPE);
 
-#define SOIL_WET 1500   // Batas tanah basah
-#define SOIL_DRY 2000   // Batas tanah kering
+// Soil moisture thresholds
+#define SOIL_WET 1500
+#define SOIL_DRY 2000
 
-// Mode manual/otomatis
-bool manualPumpMode = false; // false = auto, true = manual (set via API)
-bool pumpStatus = false;     // Pompa ON/OFF
+// Status variables
+bool manualPumpMode = false;
+bool pumpStatus = false;
+bool currentRelayState = false;
 int soilMoisture = 0;
 float temperature = 0;
 float humidity = 0;
 
-const long interval = 5000; // interval kirim data (ms)
-unsigned long previousMillis = 0;
-const long pollPumpInterval = 3000; // interval cek status pompa dari API
+// Timing configurations - LEBIH CEPAT
+const long sensorInterval = 1000;      // 2 detik
+unsigned long previousSensorMillis = 0;
+const long pollPumpInterval = 500;    // 1 detik
 unsigned long previousPumpMillis = 0;
+const int connectionTimeout = 5000;    // 5 detik
 
-// Untuk menghindari relay sering nyala-mati di batas threshold
+// Auto mode control
 bool lastAutoPumpStatus = false;
+
+// Error tracking
+int consecutiveErrors = 0;
+const int maxErrorsBeforeReconnect = 3;
+
+// Pump control optimization
+unsigned long lastRelayChange = 0;
+const long relayMinChangeInterval = 100; // Minimal 0.5 detik antara perubahan relay
+
+// For secure HTTPS connection
+WiFiClientSecure secureClient;
 
 void setup() {
   Serial.begin(115200);
-  dht.begin();
+  delay(500); // Lebih pendek
+  
+  Serial.println("\n\n==== SMART GARDEN SYSTEM ====");
+  
+  // Initialize with HIGHER priority
+  // Initialize relay FIRST for responsiveness
   pinMode(RELAY_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
+  currentRelayState = false;
+  Serial.println("Relay initialized (OFF)");
 
+  // Initialize sensor
+  dht.begin();
+  
+  // Skip certificate verification for HTTPS
+  secureClient.setInsecure();
+  
+  // Quick relay test - LEBIH CEPAT
+  testRelay();
+  
+  // Connect to WiFi
+  connectToWiFi();
+}
+
+// Tes relay lebih cepat
+void testRelay() {
+  Serial.println("Testing relay...");
+  digitalWrite(RELAY_PIN, HIGH);
+  currentRelayState = true;
+  digitalWrite(RELAY_PIN, LOW);
+  currentRelayState = false;
+  Serial.println("Relay test complete");
+}
+
+void connectToWiFi() {
+  Serial.println("\n----- CONNECTING TO WIFI -----");
+  Serial.print("Connecting to: ");
+  Serial.println(ssid);
+  
+  WiFi.disconnect();
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500); Serial.print(".");
+  
+  unsigned long startTime = millis();
+  int dots = 0;
+  
+  while (WiFi.status() != WL_CONNECTED && 
+         millis() - startTime < connectionTimeout) {
+    delay(200); // Lebih cepat
+    Serial.print(".");
+    dots++;
+    if (dots >= 20) {
+      dots = 0;
+      Serial.println();
+    }
   }
-  Serial.println("WiFi Connected");
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\nWiFi Connected!");
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("Signal Strength: ");
+    Serial.print(WiFi.RSSI());
+    Serial.println(" dBm");
+    
+    consecutiveErrors = 0;
+  } else {
+    Serial.println("\nWiFi connection failed! Running in offline mode.");
+    WiFi.disconnect();
+  }
 }
 
 void loop() {
   unsigned long currentMillis = millis();
 
-  // Poll status pompa dari API (manual/otomatis)
-  if (currentMillis - previousPumpMillis >= pollPumpInterval) {
+  // Langsung periksa status pompa dari API (prioritas utama)
+  if (currentMillis - previousPumpMillis >= pollPumpInterval && 
+      WiFi.status() == WL_CONNECTED) {
     previousPumpMillis = currentMillis;
     pollPumpStatusFromApi();
+    
+    // Update relay berdasarkan status pompa yang baru dari API
+    if (manualPumpMode) {
+      controlRelay(pumpStatus);
+    }
   }
-
-  // Baca sensor & kirim data
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
-    readSensorsAndSend();
+  
+  // Read sensors and send data
+  if (currentMillis - previousSensorMillis >= sensorInterval) {
+    previousSensorMillis = currentMillis;
+    
+    // Baca sensor
+    readSensors();
+    
+    // Update kontrol pompa untuk AUTO mode
+    if (!manualPumpMode) {
+      updateAutoPumpStatus();
+    }
+    
+    // Kirim data ke API jika connected
+    if (WiFi.status() == WL_CONNECTED) {
+      sendSensorDataToApi();
+    }
   }
+  
+  // Cek WiFi dan reconnect jika perlu - tidak prioritas
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi disconnected. Reconnecting...");
+    connectToWiFi();
+  }
+  
+  // Tidak ada delay di sini untuk responsivitas maksimal
+}
 
-  // Kontrol relay sesuai mode
-  if (manualPumpMode) {
-    // Mode manual: relay sesuai pumpStatus dari API
-    digitalWrite(RELAY_PIN, pumpStatus ? HIGH : LOW);
+void readSensors() {
+  // Baca suhu & kelembaban
+  float newHumidity = dht.readHumidity();
+  float newTemperature = dht.readTemperature();
+  
+  // Baca kelembaban tanah - lebih cepat (hanya 3 sampel)
+  int soilSum = 0;
+  for (int i = 0; i < 3; i++) {
+    soilSum += analogRead(SOIL_MOISTURE_PIN);
+  }
+  int newSoilMoisture = soilSum / 3;
+  
+  // Validasi bacaan DHT
+  if (isnan(newHumidity) || isnan(newTemperature)) {
+    Serial.println("ERROR: Failed to read from DHT sensor!");
   } else {
-    // Mode otomatis: relay sesuai auto logic, status diatur di readSensorsAndSend
-    digitalWrite(RELAY_PIN, lastAutoPumpStatus ? HIGH : LOW);
+    // Update nilai global
+    humidity = newHumidity;
+    temperature = newTemperature;
+    soilMoisture = newSoilMoisture;
+    
+    // Log data
+    Serial.println("\n----- SENSOR READINGS -----");
+    Serial.print("Temperature: "); Serial.print(temperature); Serial.println(" °C");
+    Serial.print("Humidity: "); Serial.print(humidity); Serial.println(" %");
+    Serial.print("Soil Moisture: "); Serial.print(soilMoisture);
+    
+    if (soilMoisture < SOIL_WET) {
+      Serial.println(" (WET)");
+    } else if (soilMoisture > SOIL_DRY) {
+      Serial.println(" (DRY)");
+    } else {
+      Serial.println(" (OPTIMAL)");
+    }
   }
 }
 
-void readSensorsAndSend() {
-  humidity = dht.readHumidity();
-  temperature = dht.readTemperature();
-  soilMoisture = analogRead(SOIL_MOISTURE_PIN);
-
-  if (isnan(humidity) || isnan(temperature)) {
-    Serial.println("Gagal membaca sensor DHT22!");
-    return;
+// Fungsi kontrol relay yang lebih responsif
+void controlRelay(bool shouldBeOn) {
+  // Hanya ubah relay jika perlu dan tidak terlalu sering
+  if (currentRelayState != shouldBeOn) {
+    digitalWrite(RELAY_PIN, shouldBeOn ? HIGH : LOW);
+    currentRelayState = shouldBeOn;
+    lastRelayChange = millis();
+    
+    Serial.print("RELAY CHANGED to ");
+    Serial.println(shouldBeOn ? "ON" : "OFF");
   }
+}
 
-  // Mode otomatis: Pompa nyala terus jika kering, mati setelah tanah cukup basah
-  if (!manualPumpMode) {
-    if (!lastAutoPumpStatus && soilMoisture > SOIL_DRY) {
-      // Baru ON kalau sebelumnya OFF dan tanah kering
-      lastAutoPumpStatus = true;
-      Serial.println("Pompa otomatis: ON (tanah kering)");
-    } else if (lastAutoPumpStatus && soilMoisture < SOIL_WET) {
-      // Baru OFF kalau sebelumnya ON dan tanah sudah cukup basah
-      lastAutoPumpStatus = false;
-      Serial.println("Pompa otomatis: OFF (tanah basah)");
-    }
-    // pumpStatus hanya untuk laporan ke API
-    pumpStatus = lastAutoPumpStatus;
+// Fungsi untuk update pompa di mode AUTO
+void updateAutoPumpStatus() {
+  // Mode AUTO: kontrol berdasarkan kelembaban tanah
+  if (soilMoisture > SOIL_DRY && !lastAutoPumpStatus) {
+    // Nyalakan jika tanah KERING dan pompa saat ini OFF
+    lastAutoPumpStatus = true;
+    pumpStatus = true;
+  } else if (soilMoisture < SOIL_WET && lastAutoPumpStatus) {
+    // Matikan jika tanah BASAH dan pompa saat ini ON
+    lastAutoPumpStatus = false;
+    pumpStatus = false;
   }
-  // Jika manual, pumpStatus diatur API, lastAutoPumpStatus tidak dipakai
-
-  sendSensorDataToApi();
+  
+  // Kontrol relay
+  controlRelay(lastAutoPumpStatus);
+  
+  Serial.print("AUTO Mode - Pump Status: ");
+  Serial.println(lastAutoPumpStatus ? "ON" : "OFF");
 }
 
 void sendSensorDataToApi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(sensorApiUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    String payload = "{";
-    payload += "\"temperature\":" + String(temperature, 1) + ",";
-    payload += "\"humidity\":" + String(humidity, 1) + ",";
-    payload += "\"soilMoisture\":" + String(soilMoisture) + ",";
-    payload += "\"pumpStatus\":" + String(pumpStatus ? 1 : 0);
-    payload += "}";
-
-    int httpResponseCode = http.POST(payload);
-    Serial.print("POST /api/sensor-data: ");
+  HTTPClient http;
+  http.begin(secureClient, sensorApiUrl);
+  http.addHeader("Content-Type", "application/json");
+  http.setTimeout(5000); // Lebih cepat
+  
+  // Buat JSON payload
+  StaticJsonDocument<256> doc;
+  doc["temperature"] = temperature;
+  doc["humidity"] = humidity;
+  doc["soilMoisture"] = soilMoisture;
+  doc["pumpStatus"] = currentRelayState ? 1 : 0; // Gunakan status relay aktual
+  
+  String payload;
+  serializeJson(doc, payload);
+  
+  // Kirim data tanpa print terlalu banyak
+  int httpResponseCode = http.POST(payload);
+  
+  if (httpResponseCode == 200) {
+    String response = http.getString();
+    Serial.println("Sent data successfully");
+    consecutiveErrors = 0;
+    
+    // Cek respon untuk modus auto
+    StaticJsonDocument<256> respDoc;
+    DeserializationError error = deserializeJson(respDoc, response);
+    if (!error && !manualPumpMode) {
+      // Dalam mode otomatis, kita bisa menggunakan feedback dari server
+      if (respDoc.containsKey("pumpStatus")) {
+        int apiPumpStatus = respDoc["pumpStatus"];
+        // Dapat dipertimbangkan jika ingin mengikuti status dari server
+      }
+    }
+  } else {
+    Serial.print("API POST failed: ");
     Serial.println(httpResponseCode);
-    http.end();
+    consecutiveErrors++;
   }
+  
+  http.end();
 }
 
-// Fungsi polling status pompa dari API
 void pollPumpStatusFromApi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    HTTPClient http;
-    http.begin(pumpControlApiUrl);
-    int httpResponseCode = http.GET();
-
-    if (httpResponseCode == 200) {
-      String response = http.getString();
-      // Contoh response: {"pumpStatus":1,"manual":true}
-      int pumpIdx = response.indexOf("\"pumpStatus\":");
-      int manualIdx = response.indexOf("\"manual\":");
-      if (pumpIdx != -1 && manualIdx != -1) {
-        int pumpVal = response.substring(pumpIdx + 12, response.indexOf(",", pumpIdx)).toInt();
-        int manualVal = response.substring(manualIdx + 9, response.indexOf("}", manualIdx)).toInt();
-        manualPumpMode = (manualVal == 1);
-        // Hanya update pumpStatus jika mode manual
-        if (manualPumpMode) {
-          pumpStatus = (pumpVal == 1);
+  HTTPClient http;
+  http.begin(secureClient, pumpControlApiUrl);
+  http.setTimeout(3000); // Lebih cepat
+  
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode == 200) {
+    String response = http.getString();
+    
+    // Parse JSON
+    StaticJsonDocument<256> doc;
+    DeserializationError error = deserializeJson(doc, response);
+    
+    if (!error) {
+      bool newPumpStatus = (doc.containsKey("pumpStatus") && doc["pumpStatus"] == 1);
+      bool newManualMode = (doc.containsKey("manual") && doc["manual"] == true);
+      
+      // Segera terapkan perubahan ke relay
+      if (newManualMode) {
+        if (pumpStatus != newPumpStatus || manualPumpMode != newManualMode) {
+          Serial.println("** CONTROL MODE/STATUS CHANGED **");
+          Serial.print("Manual Pump Status: ");
+          Serial.println(newPumpStatus ? "ON" : "OFF");
+          
+          // Kontrol relay dengan pumpStatus baru
+          controlRelay(newPumpStatus);
         }
-        Serial.print("PumpStatus (from API): "); Serial.println(pumpStatus);
-        Serial.print("Manual mode (from API): "); Serial.println(manualPumpMode);
+      } else if (manualPumpMode && !newManualMode) {
+        // Switching from manual to auto
+        Serial.println("** SWITCHING TO AUTO MODE **");
       }
+      
+      // Simpan status kontrol baru
+      pumpStatus = newPumpStatus;
+      manualPumpMode = newManualMode;
+      
+      consecutiveErrors = 0;
     } else {
-      Serial.print("Failed to poll pump status: "); Serial.println(httpResponseCode);
+      Serial.print("JSON parsing error: ");
+      Serial.println(error.c_str());
+      consecutiveErrors++;
     }
-    http.end();
+  } else {
+    Serial.print("Failed to poll pump status: ");
+    Serial.println(httpResponseCode);
+    consecutiveErrors++;
   }
+  
+  http.end();
 }
