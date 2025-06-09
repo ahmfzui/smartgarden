@@ -29,13 +29,20 @@ export function useAuth() {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check authentication on mount - client-side only
+  // Handle component mounting for hydration safety
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Check authentication after component is mounted
+  useEffect(() => {
+    if (!mounted) return;
+
     const initialize = async () => {
       setLoading(true);
       try {
@@ -55,26 +62,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error("Authentication error:", error);
       } finally {
         setLoading(false);
-        setAuthChecked(true);
       }
     };
 
-    // Only run on client-side to prevent hydration mismatch
-    if (typeof window !== 'undefined') {
-      initialize();
-    } else {
-      // On server, just mark as checked without doing any auth check
-      setAuthChecked(true);
-      setLoading(false);
-    }
-  }, [pathname]);
+    initialize();
+  }, [mounted, pathname, router]);
 
   const checkAuth = async (): Promise<boolean> => {
-    // Only run on client-side
-    if (typeof window === 'undefined') return false;
+    if (!mounted) return false;
     
     try {
-      // First check if we have a token in localStorage as backup
+      // Check if we have a token in localStorage
       const localToken = localStorage.getItem("smart-garden-auth");
       
       const res = await fetch("/api/auth/verify", {
@@ -103,9 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Error checking auth:", error);
       setUser(null);
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("smart-garden-auth");
-      }
+      localStorage.removeItem("smart-garden-auth");
       return false;
     }
   };
@@ -127,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error(data.message || "Login failed");
       }
 
-      // Store auth token in localStorage as backup
+      // Store auth token in localStorage
       localStorage.setItem("smart-garden-auth", data.token);
       
       // Set user data
@@ -163,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Separate client-side loading component to avoid hydration mismatches
+  // Loading component
   const LoadingComponent = () => (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-bl from-emerald-900/30 via-cyan-900/20 to-purple-900/30">
       <div className="relative">
@@ -181,6 +177,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     </div>
   );
 
+  // Don't render anything until mounted (prevents hydration mismatch)
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-bl from-emerald-900/30 via-cyan-900/20 to-purple-900/30">
+        <div className="relative">
+          <div className="relative w-20 h-20 rounded-full flex items-center justify-center bg-gradient-to-br from-slate-800/60 to-slate-900/60 border border-white/10 shadow-md">
+            <div className="absolute inset-0 border-4 border-emerald-500/20 rounded-full animate-spin" />
+          </div>
+          <p className="text-center mt-4 text-emerald-300">Memuat...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -191,13 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         checkAuth,
       }}
     >
-      {typeof window === 'undefined' ? (
-        // On server-side render, just show the children
-        children
-      ) : (
-        // On client-side, we can conditionally render based on auth status
-        authChecked ? children : <LoadingComponent />
-      )}
+      {loading ? <LoadingComponent /> : children}
     </AuthContext.Provider>
   );
 }
